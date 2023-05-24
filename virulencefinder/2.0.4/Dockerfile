@@ -85,21 +85,24 @@ WORKDIR /test
 # Escherichia coli complete genome (Unicycler assembly)
 # GenBank Nucleotide entry: https://www.ncbi.nlm.nih.gov/nuccore/CP113091.1/
 # BioSample:SAMN08799860
-RUN mkdir -v /test/asm-input && \
+RUN mkdir -v /test/asm-input /test/tmp && \
  wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/012/224/845/GCA_012224845.2_ASM1222484v2/GCA_012224845.2_ASM1222484v2_genomic.fna.gz && \
  gunzip GCA_012224845.2_ASM1222484v2_genomic.fna.gz && \
- virulencefinder.py -i /test/GCA_012224845.2_ASM1222484v2_genomic.fna -x -o /test/asm-input && \
+ virulencefinder.py -i /test/GCA_012224845.2_ASM1222484v2_genomic.fna -x -o /test/asm-input -tmp /test/tmp && \
  cat /test/asm-input/results_tab.tsv
 
 # download Illumina reads for the same sample ^ and test reads as input into VirulenceFinder
-RUN mkdir /test/reads-input && \
- wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR690/006/SRR6903006/SRR6903006_1.fastq.gz && \
- virulencefinder.py -i SRR6903006_1.fastq.gz -mp kma -x -o /test/reads-input && \
+#  wget -q ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR690/006/SRR6903006/SRR6903006_2.fastq.gz && \
+RUN rm -rf /test/tmp/* && mkdir /test/reads-input && \
+ echo "downloading FASTQ from ENA (this may take a minute or so)..." && \
+ wget -q ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR690/006/SRR6903006/SRR6903006_1.fastq.gz && \
+ wget -q ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR690/006/SRR6903006/SRR6903006_2.fastq.gz && \
+ virulencefinder.py -i SRR6903006_1.fastq.gz SRR6903006_2.fastq.gz -mp kma -x -o /test/reads-input -tmp /test/tmp -d virulence_ecoli && \
  cat /test/reads-input/results_tab.tsv
 
 # test using FASTA supplied with VirulenceFinder code; print help options
 # expect to see hits to astA and 2 stx genes; unfortunately it finds astA and 3 stx genes (that don't match)
 # issue created here: https://bitbucket.org/genomicepidemiology/virulencefinder/issues/11/test-results-do-not-match-expected-results
 RUN cd /virulencefinder/test && \
- virulencefinder.py -i test.fsa -o . -mp blastn -x -q && \
+ virulencefinder.py -i test.fsa -o . -mp blastn -x -q -tmp /test/tmp && \
  virulencefinder.py --help

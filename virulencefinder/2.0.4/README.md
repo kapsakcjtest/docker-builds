@@ -59,20 +59,34 @@ optional arguments:
 
 ## Notes and Recommendations
 
-- You do not need to supply a database or use the `-p` or `-d` flags
-  - Database is included in the image and is in the default/expected location within the image filesystem: `/database`
-  - (*NOT RECOMMENDED*) If you do need to use your own database, you will need to first index it with `kma` and use the `virulencefinder.py -p` flag. You can find instructions for this on the VirulenceFinder Bitbucket README. `kma` is included in this docker image for database indexing.
-  - VirulenceFinder does **NOT** create an output directory when you use the `-o` flag. You MUST create it beforehand or it will throw an error.
-  - **Default % Identity threshold: 90%**. Adjust with `-t 0.95`
-  - **Default % coverage threshold: 60%**. Adjust with `-l 0.70`
-  - Use the `-x` flag (extended output) if you want the traditional/legacy VirulenceFinder output files `results_tab.tsv  results.txt  Virulence_genes.fsa  Hit_in_genome_seq.fsa`. Otherwise you will need to parse the default output file `data.json` for results
-  - (*RECOMMENDED*) Use raw reads due to the increased sensitivity (without loss of specificity) and the additional information gleaned from KMA output (specifically the depth metric). You also save time from having to assemble the genome first. [CITATION NEEDED, PROBABLY THE KMA PAPER]
+- Although it is not technically required, I highly recommend to use the temporary directory option, example: `virulencefinder.py -tmp /tmp <other-options-and-inputs>`, because when supplying reads/FASTQs as input, `kma` requires a temporary directory for intermediate files. When `-tmp` is not specified, `kma` may **silently take an error and `virulencefinder.py` will finish without error or non-zero exit code, leaving the user unaware that `kma` has failed.**
+- By default, all databases will be queried, but a specific database can be queried with the `-d <database-name>` option. Available databases:
+  - `virulence_ecoli` - Virulence genes for Escherichia coli
+  - `virulence_ent` - Virulence genes for Enterococcus
+  - `listeria` - Virulence genes for Listeria
+  - `s.aureus_exoenzyme` - Exoenzyme genes for S. aureus
+  - `s.aureus_hostimm` - Hostimm genes for S. aureus
+  - `s.aureus_toxin` - Toxin genes for S. aureus
+  - `stx` - Shiga-toxin genes for E. coli
+- These databases are included in the image and are located in the default/expected location within the image filesystem: `/database`
+- (*NOT RECOMMENDED*) If you do need to use your own database, you will need to first index it with `kma` and use the `virulencefinder.py -p` flag. You can find instructions for this on the VirulenceFinder Bitbucket README. `kma` is included in this docker image for database indexing.
+- VirulenceFinder does **NOT** create an output directory when you use the `-o` flag. You MUST create it beforehand or it will throw an error.
+- **Default % Identity threshold: 90%**. Adjust with `-t 0.95`
+- **Default % coverage threshold: 60%**. Adjust with `-l 0.70`
+- Use the `-x` flag (extended output) if you want the traditional/legacy VirulenceFinder output files `results_tab.tsv  results.txt  Virulence_genes.fsa  Hit_in_genome_seq.fsa`. Otherwise you will need to parse the default output file `data.json` for results.
+- (*RECOMMENDED*) Use raw reads due to the increased sensitivity (without loss of specificity) and the additional information gleaned from KMA output (specifically the depth metric). You also save time from having to assemble the genome first. [CITATION NEEDED, PROBABLY THE KMA PAPER]
 - Querying reads:
   - This will run VirulenceFinder with `kma` (instead of ncbi-blast+)
   - Only one of the PE read files is necessary. There is likely little benefit to using both R1 and R2. It will take longer to run if you use both R1 and R2 files.
 - Querying assemblies:
   - This will run VirulenceFinder with `ncbi-blast+`
   - VirulenceFinder does not clean up after itself. `tmp/` (which contains 7 different `.xml` files) will exist in the specified output directory
+
+### Known issues
+
+- Virulencefinder struggles when 2 FASTQ files are passed when running against all databases (`-d <db-name>` option is NOT used) **AND** when using the shigatoxin database with `-d stx`.
+- Virulencefinder does not run successfully when working with 1 FASTQ using the `-d virulence_ecoli` database
+- ANY OTHERS TO ADD??
 
 ## Example Usage: Docker
 
@@ -89,11 +103,11 @@ $ mkdir output-dir-reads output-dir-asm
 
 # query reads, mount PWD to /data inside container (broken into two lines for readabilty)
 $ docker run --rm -u $(id -u):$(id -g) -v $PWD:/data staphb/virulencefinder:2.0.1 \
-    virulencefinder.py -i /data/E-coli.R1.fastq.gz -o /data/output-dir-reads
+    virulencefinder.py -i /data/E-coli.R1.fastq.gz -o /data/output-dir-reads -tmp /tmp
 
 # query assembly
 $ docker run --rm -u $(id -u):$(id -g) -v $PWD:/data staphb/virulencefinder:2.0.1 \
-    virulencefinder.py -i /data/E-coli.skesa.fasta  -o /data/output-dir-asm
+    virulencefinder.py -i /data/E-coli.skesa.fasta  -o /data/output-dir-asm -tmp /tmp
 ```
 
 ## Example Usage: Singularity
@@ -111,9 +125,9 @@ $ mkdir output-dir-reads output-dir-asm
 
 # query reads; mount PWD to /data inside container
 $ singularity exec --no-home -B $PWD:/data virulencefinder.2.0.4.sif \
-    virulencefinder.py -i /data/E-coli.R1.fastq.gz -o /data/output-dir-reads
+    virulencefinder.py -i /data/E-coli.R1.fastq.gz -o /data/output-dir-reads -tmp /tmp
 
 # assembly
 $ singularity exec --no-home -B $PWD:/data virulencefinder.2.0.4.sif \
-    virulencefinder.py -i /data/E-coli.skesa.fasta  -o /data/output-dir-asm
+    virulencefinder.py -i /data/E-coli.skesa.fasta  -o /data/output-dir-asm -tmp /tmp
 ```
